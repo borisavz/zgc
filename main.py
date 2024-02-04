@@ -1,7 +1,14 @@
 class Heap:
     def __init__(self):
-        self.pages = {}
-        self.current_page = None
+        self.current_page_address = None
+        self.pages = {
+            self.current_page_address: Page()
+        }
+
+    def add_object(self, object):
+        object_address = self.pages[self.current_page_address].add_object(object)
+
+        return (self.current_page_address, object_address)
 
     def get_object(self, address):
         page_address = address[0]
@@ -27,6 +34,11 @@ class Page:
         self.objects = {}
         self.evacuation_candidate = False
 
+    def add_object(self, object):
+        object_address = None
+        self.objects[object_address] = object
+        return object_address
+
     def get_object(self, address):
         return self.objects[address]
 
@@ -45,6 +57,9 @@ class Object:
         self.name = name
         self.references = list()
 
+    def copy(self):
+        return None
+
 
 def marking_remapping():
     pass
@@ -62,12 +77,10 @@ def relocation():
 
 def relocate(old_address, object):
     if old_address not in forwarding_table:
-        new_address = copy(object)
+        new_object = object.copy()
+        new_address = heap.add_object(new_object)
+
         forwarding_table[old_address] = new_address
-
-
-def copy(object):
-    return None
 
 
 def stw1():
