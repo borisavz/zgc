@@ -1,6 +1,33 @@
+from enum import Enum
+from uuid import uuid4
+
+
+class GlobalPhase(Enum):
+    MARKING = 0
+    REMAPPING = 1
+
+
+class MarkingPhase(Enum):
+    MARKING0 = 0
+    MARKING1 = 1
+
+    def next_phase(self, current):
+        if current == MarkingPhase.MARKING0:
+            return MarkingPhase.MARKING1
+
+        return MarkingPhase.MARKING0
+
+
+phase = GlobalPhase.MARKING
+mark_phase = MarkingPhase.MARKING0
+forwarding_table = {}
+roots = []
+mark_stack = []
+
+
 class Heap:
     def __init__(self):
-        self.current_page_address = None
+        self.current_page_address = uuid4()
         self.pages = {
             self.current_page_address: Page()
         }
@@ -33,9 +60,10 @@ class Page:
     def __init__(self):
         self.objects = {}
         self.evacuation_candidate = False
+        self.relocatable = False
 
     def add_object(self, object):
-        object_address = None
+        object_address = uuid4()
         self.objects[object_address] = object
         return object_address
 
@@ -47,18 +75,35 @@ class Reference:
     def __init__(self, address):
         self.address = address
         self.finalizable = False
-        self.marked0 = phase == 0
-        self.marked1 = phase == 1
-        self.remapped = phase == 2
+        self.marked0 = False
+        self.marked1 = False
+        self.remapped = False
+
+        self.color()
+
+    def color(self):
+        global phase, mark_phase
+
+        if phase == GlobalPhase.MARKING:
+            self.marked0 = mark_phase == MarkingPhase.MARKING0
+            self.marked1 = mark_phase == MarkingPhase.MARKING1
+            self.remapped = False
+        else:
+            self.marked0 = False
+            self.marked1 = False
+            self.remapped = True
 
 
 class Object:
-    def __init__(self, name):
+    def __init__(self, name, references=None):
+        if references is None:
+            references = []
+
         self.name = name
-        self.references = list()
+        self.references = references
 
     def copy(self):
-        return None
+        return Object(self.name, self.references)
 
 
 def marking_remapping():
@@ -84,7 +129,12 @@ def relocate(old_address, object):
 
 
 def stw1():
-    pass
+    global mark_phase
+
+    for r in roots:
+        r.color()
+
+    mark_phase = mark_phase.next_phase(mark_phase)
 
 
 def stw3():
@@ -99,7 +149,16 @@ def load_barrier():
     pass
 
 
-phase = 0
-forwarding_table = {}
-roots = []
 heap = Heap()
+
+a = Object('a')
+b = Object('b')
+c = Object('c')
+
+addr_a = heap.add_object(a)
+addr_b = heap.add_object(b)
+addr_c = heap.add_object(c)
+
+roots.append(Reference(addr_a))
+roots.append(Reference(addr_b))
+roots.append(Reference(addr_c))
